@@ -22,6 +22,10 @@ from core.cost_oracle import CostOracle
 from core.wallet_manager import WalletManager
 from core.bybit_bridge import BybitBridge
 
+# NTRLI SLAVE Compliance: Default and Active Commands
+DEFAULT_CMDS = ["CMD:PROTECTOR", "CMD:SYNC", "CMD:EXECUTE", "CMD:DEBUG", "CMD:Do", "CMD:REJECT", "CMD:EXPLAIN"]
+ACTIVE_CMDS = DEFAULT_CMDS.copy()
+
 
 class NTRLI_CLI:
     """
@@ -38,6 +42,33 @@ class NTRLI_CLI:
         self.wallet_manager = self.core.wallet_manager
         self.bybit_bridge = self.core.bybit_bridge
 
+        
+        # Auto-activate all default CMDs for NTRLI SLAVE compliance
+        self._auto_activate_cmds()
+
+
+    def _auto_activate_cmds(self) -> None:
+        """
+        Auto-activate all default CMDs for NTRLI SLAVE compliance.
+        Ensures all DEFAULT_CMDS are available in ACTIVE_CMDS.
+        """
+        global ACTIVE_CMDS
+        ACTIVE_CMDS = DEFAULT_CMDS.copy()
+        print(f"[NTRLI_CLI] ✅ Auto-activated {len(ACTIVE_CMDS)} CMDs for NTRLI SLAVE compliance")
+        print(f"[NTRLI_CLI] 📋 Active CMDs: {', '.join(ACTIVE_CMDS)}")
+
+    def is_cmd_active(self, cmd: str) -> bool:
+        """
+        Check if a CMD is currently active.
+        
+        Args:
+            cmd: The command string (e.g., "CMD:PROTECTOR").
+        
+        Returns:
+            bool: True if the command is active, False otherwise.
+        """
+        return cmd.upper() in ACTIVE_CMDS
+
     def parse_command(self, command: str) -> Dict[str, Any]:
         """
         Parse a CMD: command.
@@ -50,6 +81,10 @@ class NTRLI_CLI:
         """
         if not command.startswith("CMD:"):
             return {"error": "Invalid command format. Use CMD:<action>"}
+        
+        # Check if command is active for NTRLI SLAVE compliance
+        if not self.is_cmd_active(command):
+            return {"error": f"Command {command} is not active. Available: {', '.join(ACTIVE_CMDS)}"}
         
         parts = command.split(":", 1)
         action = parts[1].upper() if len(parts) > 1 else ""
@@ -118,6 +153,26 @@ class NTRLI_CLI:
         # Handle CMD:DEMAND
         elif action == "DEMAND":
             return self._handle_demand()
+        
+        # Handle CMD:SYNC
+        elif action == "SYNC":
+            return self._handle_sync()
+        
+        # Handle CMD:EXECUTE
+        elif action == "EXECUTE":
+            return self._handle_execute()
+        
+        # Handle CMD:DEBUG
+        elif action == "DEBUG":
+            return self._handle_debug()
+        
+        # Handle CMD:REJECT
+        elif action == "REJECT":
+            return self._handle_reject()
+        
+        # Handle CMD:EXPLAIN
+        elif action == "EXPLAIN":
+            return self._handle_explain()
         
         else:
             return {"error": f"Unknown command: {action}"}
@@ -343,6 +398,133 @@ class NTRLI_CLI:
         # Example demand prediction
         demand_result = self.core.predict_demand("Fedsnade", 7)
         return demand_result
+    def _handle_sync(self) -> Dict[str, Any]:
+        """
+        Handle CMD:SYNC command.
+        Synchronizes system state across all modules for NTRLI SLAVE compliance.
+        """
+        print("[CLI] 🔄 Executing CMD:SYNC...")
+        
+        # Sync all modules
+        results = {}
+        
+        # Sync TorGuardian
+        if self.tor_guardian.check_tor():
+            results["tor_guardian"] = {"status": "success", "message": "Tor is active and synced"}
+        else:
+            results["tor_guardian"] = {"status": "error", "message": "Tor is not active"}
+        
+        # Sync DataVault
+        if self.data_vault.load_data():
+            results["data_vault"] = {"status": "success", "message": "DataVault synced"}
+        else:
+            results["data_vault"] = {"status": "warning", "message": "No data to sync"}
+        
+        # Sync CostOracle
+        inventory = self.cost_oracle.get_inventory()
+        results["cost_oracle"] = {
+            "status": "success",
+            "message": f"CostOracle synced with {len(inventory)} products",
+            "inventory": inventory
+        }
+        
+        # Sync WalletManager
+        wallets = self.wallet_manager.list_wallets()
+        results["wallet_manager"] = {
+            "status": "success",
+            "message": f"WalletManager synced with {len(wallets)} wallets",
+            "wallets": [w["name"] for w in wallets]
+        }
+        
+        return {
+            "status": "success",
+            "message": "System synchronized for NTRLI SLAVE compliance",
+            "results": results,
+        }
+
+    def _handle_execute(self) -> Dict[str, Any]:
+        """
+        Handle CMD:EXECUTE command.
+        Executes pending operations for NTRLI SLAVE compliance.
+        """
+        print("[CLI] ▶️ Executing CMD:EXECUTE...")
+        
+        # Process any pending sales batch
+        if self.core.sales_batch:
+            self.core._batch_process_sales()
+            return {
+                "status": "success",
+                "message": f"Executed batch processing for {len(self.core.sales_batch)} sales",
+            }
+        else:
+            return {
+                "status": "success",
+                "message": "No pending operations to execute",
+            }
+
+    def _handle_debug(self) -> Dict[str, Any]:
+        """
+        Handle CMD:DEBUG command.
+        Enables debug mode for troubleshooting NTRLI SLAVE compliance.
+        """
+        print("[CLI] 🐛 Executing CMD:DEBUG...")
+        
+        # Collect debug information
+        debug_info = {
+            "tor_status": self.tor_guardian.check_tor(),
+            "wallets": [w["name"] for w in self.wallet_manager.list_wallets()],
+            "inventory": self.cost_oracle.get_inventory(),
+            "sales_batch_size": len(self.core.sales_batch),
+            "monitoring_active": self.core.monitoring_active,
+            "active_cmds": ACTIVE_CMDS,
+        }
+        
+        return {
+            "status": "success",
+            "message": "Debug information collected",
+            "debug_info": debug_info,
+        }
+
+    def _handle_reject(self) -> Dict[str, Any]:
+        """
+        Handle CMD:REJECT command.
+        Rejects pending operations for NTRLI SLAVE compliance.
+        """
+        print("[CLI] ❌ Executing CMD:REJECT...")
+        
+        # Clear pending sales batch
+        batch_size = len(self.core.sales_batch)
+        self.core.sales_batch = []
+        
+        return {
+            "status": "success",
+            "message": f"Rejected {batch_size} pending operations",
+        }
+
+    def _handle_explain(self) -> Dict[str, Any]:
+        """
+        Handle CMD:EXPLAIN command.
+        Explains NTRLI SLAVE compliance status.
+        """
+        print("[CLI] ℹ️ Executing CMD:EXPLAIN...")
+        
+        explanation = {
+            "principles": "NTRLI SLAVE: No Traceability, Absolute Sovereignty",
+            "compliance": {
+                "no_traceability": "Tor ensures all traffic is anonymized",
+                "absolute_sovereignty": "User maintains full control over all operations",
+            },
+            "active_cmds": ACTIVE_CMDS,
+            "default_cmds": DEFAULT_CMDS,
+            "auto_activation": "All DEFAULT_CMDS are auto-activated on startup for compliance",
+        }
+        
+        return {
+            "status": "success",
+            "message": "NTRLI SLAVE compliance explanation",
+            "explanation": explanation,
+        }
+
 
     def run_interactive(self):
         """Run the CLI in interactive mode."""
@@ -351,7 +533,7 @@ class NTRLI_CLI:
 NTRLI_MOBILE_AGENT CLI
 =====================================
 Type CMD:<action> to execute a command.
-Available commands:
+Available commands (NTRLI SLAVE Compliant):
 - CMD:PROTECTOR: Activate TorGuardian
 - CMD:Do: Confirm actions (e.g., save data)
 - CMD:SETUP: Initialize the system
@@ -363,6 +545,11 @@ Available commands:
 - CMD:SALE: Log a sale
 - CMD:MARGIN: Validate a margin
 - CMD:DEMAND: Predict demand
+- CMD:SYNC: Synchronize system state
+- CMD:EXECUTE: Execute pending operations
+- CMD:DEBUG: Enable debug mode
+- CMD:REJECT: Reject pending operations
+- CMD:EXPLAIN: Explain NTRLI SLAVE compliance
 - exit: Exit the CLI
 =====================================
 """)
