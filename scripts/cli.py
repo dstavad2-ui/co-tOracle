@@ -23,8 +23,29 @@ from core.wallet_manager import WalletManager
 from core.bybit_bridge import BybitBridge
 
 # NTRLI SLAVE Compliance: Default and Active Commands
-DEFAULT_CMDS = ["CMD:PROTECTOR", "CMD:SYNC", "CMD:EXECUTE", "CMD:DEBUG", "CMD:Do", "CMD:REJECT", "CMD:EXPLAIN"]
+DEFAULT_CMDS = ["CMD:PROTECTOR", "CMD:SYNC", "CMD:EXECUTE", "CMD:DEBUG", "CMD:Do", "CMD:REJECT", "CMD:EXPLAIN", "CMD:LINKS"]
 ACTIVE_CMDS = DEFAULT_CMDS.copy()
+
+# CMD Link/Alias System
+CMD_LINKS = {
+    "PROTECTOR": ["PROTECTOR", "TOR", "SHIELD"],
+    "SYNC": ["SYNC", "SYNCHRONIZE", "UPDATE"],
+    "EXECUTE": ["EXECUTE", "RUN", "GO"],
+    "DEBUG": ["DEBUG", "TRACE", "LOG", "DIAG"],
+    "Do": ["Do", "CONFIRM", "YES", "OK"],
+    "REJECT": ["REJECT", "NO", "CANCEL", "ABORT"],
+    "EXPLAIN": ["EXPLAIN", "HELP", "INFO", "MAN"],
+    "LINKS": ["LINKS", "ALIASES", "SHORTCUTS", "MAP"],
+    "SETUP": ["SETUP", "INIT", "INSTALL", "BOOTSTRAP"],
+    "START": ["START", "LAUNCH", "BEGIN"],
+    "STOP": ["STOP", "HALT", "QUIT", "END"],
+    "TEST": ["TEST", "CHECK", "VERIFY", "PING"],
+    "WIPE": ["WIPE", "CLEAR", "DELETE", "RESET"],
+    "MONITOR": ["MONITOR", "WATCH", "TRACK", "OBSERVE"],
+    "SALE": ["SALE", "SELL", "TRANSACT", "DEAL"],
+    "MARGIN": ["MARGIN", "PROFIT", "PRICE", "COST"],
+    "DEMAND": ["DEMAND", "FORECAST", "PREDICT", "ESTIMATE"],
+}
 
 
 class NTRLI_CLI:
@@ -69,6 +90,17 @@ class NTRLI_CLI:
         """
         return cmd.upper() in ACTIVE_CMDS
 
+    def list_cmd_links(self) -> Dict[str, List[str]]:
+        """List all available CMD links/aliases."""
+        return CMD_LINKS
+
+    def _resolve_cmd_link(self, action: str) -> str:
+        """Resolve a CMD action through the link/alias system."""
+        for canonical, aliases in CMD_LINKS.items():
+            if action in aliases:
+                return canonical
+        return action
+
     def parse_command(self, command: str) -> Dict[str, Any]:
         """
         Parse a CMD: command.
@@ -82,12 +114,21 @@ class NTRLI_CLI:
         if not command.startswith("CMD:"):
             return {"error": "Invalid command format. Use CMD:<action>"}
         
-        # Check if command is active for NTRLI SLAVE compliance
-        if not self.is_cmd_active(command):
-            return {"error": f"Command {command} is not active. Available: {', '.join(ACTIVE_CMDS)}"}
-        
         parts = command.split(":", 1)
         action = parts[1].upper() if len(parts) > 1 else ""
+        
+        # Resolve CMD links/aliases to their canonical form
+        resolved_action = self._resolve_cmd_link(action)
+        if resolved_action != action:
+            print(f"[CLI] 🔗 CMD link resolved: {action} → {resolved_action}")
+        action = resolved_action
+        
+        # Reconstruct full command for validation
+        full_cmd = f"CMD:{action}"
+        
+        # Check if command is active for NTRLI SLAVE compliance
+        if not self.is_cmd_active(full_cmd):
+            return {"error": f"Command {full_cmd} is not active. Available: {', '.join(ACTIVE_CMDS)}"}
         
         return {
             "action": action,
@@ -173,6 +214,10 @@ class NTRLI_CLI:
         # Handle CMD:EXPLAIN
         elif action == "EXPLAIN":
             return self._handle_explain()
+        
+        # Handle CMD:LINKS
+        elif action == "LINKS":
+            return self._handle_links()
         
         else:
             return {"error": f"Unknown command: {action}"}
@@ -525,6 +570,26 @@ class NTRLI_CLI:
             "explanation": explanation,
         }
 
+    def _handle_links(self) -> Dict[str, Any]:
+        """
+        Handle CMD:LINKS command.
+        Lists all available CMD links/aliases.
+        """
+        print("[CLI] 🔗 Executing CMD:LINKS...")
+        
+        links = self.list_cmd_links()
+        links_display = {}
+        for canonical, aliases in links.items():
+            aliases_display = [a for a in aliases if a != canonical]
+            links_display[f"CMD:{canonical}"] = aliases_display
+        
+        return {
+            "status": "success",
+            "message": "Available CMD links/aliases",
+            "links": links_display,
+            "total_links": sum(len(v) for v in links.values()),
+            "total_commands": len(links),
+        }
 
     def run_interactive(self):
         """Run the CLI in interactive mode."""
