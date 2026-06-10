@@ -3,35 +3,43 @@
 CostOracle Module
 =================
 Calculates costs, margins, and prices for NTRLI's products.
-- Uses static data (e.g., basehash_cost_per_gram = 28 DKK).
+- Static cost data (e.g., basehash_cost_per_gram = 28 DKK).
+- Dynamic pricing via AI Oracle (Devstral).
 - Validates margins against NTRLI's requirements.
-- Predicts demand based on historical sales data.
+- Supports multiple cryptocurrencies (BTC, XMR, LTC, BCH).
+
+NTRLI Principles:
+- No Taxes: No financial reporting.
+- No Traceability: No transaction logging.
+- Absolute Sovereignty: User controls pricing.
 """
 
 import os
 import json
 import math
-from typing import Optional, Dict, Any, Tuple
-from pathlib import Path
+import secrets
+from typing import Optional, Dict, Any, List
+from datetime import datetime
 
 
 class CostOracle:
     """
     Calculates and validates costs, margins, and prices for NTRLI's products.
+    Supports dynamic pricing via AI Oracle.
     """
 
     # Static cost data (DKK)
     STATIC_COSTS = {
-        "basehash_cost_per_gram": 28.0,  # DKK per gram
-        "extraction_yield": 0.4,         # 40% yield (5g basehash -> 2g extract)
-        "labor_cost_per_batch": 50.0,    # DKK per batch
-        "packaging_cost_per_unit": 5.0,  # DKK per unit
-        "shipping_cost": 20.0,           # DKK per shipment
+        "basehash_cost_per_gram": 28.0,
+        "extraction_yield": 0.4,
+        "labor_cost_per_batch": 50.0,
+        "packaging_cost_per_unit": 5.0,
+        "shipping_cost": 20.0,
     }
 
     # Margin requirements (percentage)
     MARGIN_REQUIREMENTS = {
-        "knd": 0.8588,  # 85.88% for kanalmedlemmer (channel members)
+        "knd": 0.8588,  # 85.88% for kanalmedlemmer
         "ret": 0.70,    # 70% for retail
         "whs": 0.60,    # 60% for wholesale
     }
@@ -39,32 +47,62 @@ class CostOracle:
     # Product database
     PRODUCTS = {
         "Fedsnade": {
-            "basehash_required_per_gram": 2.5,  # 2.5g basehash -> 1g Fedsnade
+            "basehash_required_per_gram": 2.5,
             "category": "knd",
+            "supported_currencies": ["BTC", "XMR", "LTC", "BCH"],
         },
         "Basehash": {
-            "basehash_required_per_gram": 1.0,   # 1g basehash -> 1g Basehash
+            "basehash_required_per_gram": 1.0,
             "category": "knd",
+            "supported_currencies": ["BTC", "XMR", "LTC", "BCH"],
         },
         "HashOlie": {
-            "basehash_required_per_gram": 3.0,   # 3g basehash -> 1g HashOlie
+            "basehash_required_per_gram": 3.0,
             "category": "ret",
+            "supported_currencies": ["BTC", "XMR", "LTC", "BCH"],
         },
     }
 
-    def __init__(self, config_path: Optional[str] = None):
+    # Cryptocurrency conversion rates (DKK per unit)
+    CRYPTO_RATES = {
+        "BTC": 500000.0,
+        "XMR": 2500.0,
+        "LTC": 1000.0,
+        "BCH": 15000.0,
+    }
+
+    # Static margins (fallback if AI fails)
+    STATIC_MARGINS = {
+        "BTC": 10.0,
+        "XMR": 15.0,
+        "LTC": 8.0,
+        "BCH": 12.0
+    }
+
+    # Dynamic pricing factors
+    DYNAMIC_FACTORS = {
+        "BTC": 1.0,
+        "XMR": 1.1,
+        "LTC": 0.95,
+        "BCH": 0.98,
+    }
+
+    def __init__(self, config_path: Optional[str] = None, ai_pricing_engine: Optional[Any] = None):
         """
         Initialize CostOracle with configuration.
         
         Args:
-            config_path: Path to settings.json. If None, uses default path.
+            config_path: Path to settings.json.
+            ai_pricing_engine: Optional AIPricingEngine for dynamic margins.
         """
         self.config_path = config_path or os.path.join(
             os.path.dirname(__file__), "..", "config", "settings.json"
         )
         self.config = self._load_config()
-        self.inventory = {}
-        self.sales_log = []
+        self.ai_pricing_engine = ai_pricing_engine
+        self.inventory: Dict[str, float] = {}
+        self.sales_log: List[Dict[str, Any]] = []
+        self.dynamic_pricing_enabled = self.config.get("cost_oracle", {}).get("dynamic_pricing_enabled", True)
 
     def _load_config(self) -> Dict:
         """Load configuration from settings.json."""
@@ -74,34 +112,62 @@ class CostOracle:
         except (FileNotFoundError, json.JSONDecodeError):
             return {}
 
-    def calculate_extract_cost(self, basehash_grams: float) -> float:
+    # ==================== CRYPTO RATES ====================
+    def update_crypto_rates(self, new_rates: Dict[str, float]) -> None:
+        """Update cryptocurrency conversion rates."""
+        self.CRYPTO_RATES.update(new_rates)
+        print(f"[CostOracle] 💰 Updated crypto rates: {new_rates}")
+
+    def fetch_live_rates(self) -> Dict[str, float]:
+        """Fetch live cryptocurrency rates (simulated)."""
+        print("[CostOracle] 🌍 Fetching live crypto rates...")
+        simulated_rates = {
+            "BTC": self.CRYPTO_RATES["BTC"] * secrets.SystemRandom().uniform(0.95, 1.05),
+            "XMR": self.CRYPTO_RATES["XMR"] * secrets.SystemRandom().uniform(0.95, 1.05),
+            "LTC": self.CRYPTO_RATES["LTC"] * secrets.SystemRandom().uniform(0.95, 1.05),
+            "BCH": self.CRYPTO_RATES["BCH"] * secrets.SystemRandom().uniform(0.95, 1.05),
+        }
+        self.update_crypto_rates(simulated_rates)
+        return simulated_rates
+
+    def get_crypto_rate(self, currency: str) -> float:
+        """Get the current conversion rate for a cryptocurrency."""
+        return self.CRYPTO_RATES.get(currency, 0.0)
+
+    # ==================== DYNAMIC PRICING (AI) ====================
+    async def calculate_margin(self, currency: str) -> float:
         """
-        Calculate the cost per gram of extract based on basehash input.
+        Calculate dynamic margin for a currency (via AI or static fallback).
         
         Args:
-            basehash_grams: Amount of basehash in grams.
+            currency: Cryptocurrency symbol (e.g., "BTC", "XMR").
         
         Returns:
-            float: Cost per gram of extract in DKK.
+            float: Margin percentage.
         """
+        if self.dynamic_pricing_enabled and self.ai_pricing_engine:
+            try:
+                return await self.ai_pricing_engine.get_dynamic_margin(currency)
+            except Exception as e:
+                print(f"[CostOracle] ⚠️ AI pricing failed, falling back to static margin: {e}")
+        return self.STATIC_MARGINS.get(currency, 10.0)
+
+    # ==================== COST CALCULATIONS ====================
+    def calculate_extract_cost(self, basehash_grams: float, currency: str = "BTC") -> float:
+        """Calculate cost per gram of extract."""
         basehash_cost = basehash_grams * self.STATIC_COSTS["basehash_cost_per_gram"]
         extract_grams = basehash_grams * self.STATIC_COSTS["extraction_yield"]
         labor_cost = self.STATIC_COSTS["labor_cost_per_batch"]
         total_cost = basehash_cost + labor_cost
         cost_per_gram = total_cost / extract_grams
+        
+        if self.dynamic_pricing_enabled and currency in self.DYNAMIC_FACTORS:
+            cost_per_gram *= self.DYNAMIC_FACTORS[currency]
+        
         return round(cost_per_gram, 2)
 
-    def calculate_product_cost(self, product_name: str, quantity: float) -> float:
-        """
-        Calculate the total cost for producing a specific product.
-        
-        Args:
-            product_name: Name of the product (e.g., "Fedsnade").
-            quantity: Quantity in grams.
-        
-        Returns:
-            float: Total production cost in DKK.
-        """
+    def calculate_product_cost(self, product_name: str, quantity: float, currency: str = "BTC") -> float:
+        """Calculate total production cost for a product."""
         if product_name not in self.PRODUCTS:
             raise ValueError(f"Unknown product: {product_name}")
         
@@ -111,30 +177,23 @@ class CostOracle:
         labor_cost = self.STATIC_COSTS["labor_cost_per_batch"]
         packaging_cost = quantity * self.STATIC_COSTS["packaging_cost_per_unit"]
         total_cost = basehash_cost + labor_cost + packaging_cost
+        
+        if self.dynamic_pricing_enabled and currency in self.DYNAMIC_FACTORS:
+            total_cost *= self.DYNAMIC_FACTORS[currency]
+        
         return round(total_cost, 2)
 
-    def validate_margin(self, product_name: str, price: float, category: str) -> Dict[str, Any]:
-        """
-        Validate if a price meets NTRLI's margin requirements.
-        
-        Args:
-            product_name: Name of the product.
-            price: Selling price in DKK.
-            category: Customer category (e.g., "knd", "ret", "whs").
-        
-        Returns:
-            Dict: Validation result with details.
-        """
+    # ==================== MARGIN VALIDATION ====================
+    def validate_margin(
+        self, product_name: str, price: float, category: str, currency: str = "BTC"
+    ) -> Dict[str, Any]:
+        """Validate if a price meets NTRLI's margin requirements."""
         if product_name not in self.PRODUCTS:
             return {"valid": False, "error": f"Unknown product: {product_name}"}
-        
         if category not in self.MARGIN_REQUIREMENTS:
             return {"valid": False, "error": f"Unknown category: {category}"}
         
-        # Calculate production cost (assume 1 gram for simplicity)
-        production_cost = self.calculate_product_cost(product_name, 1.0)
-        
-        # Calculate margin
+        production_cost = self.calculate_product_cost(product_name, 1.0, currency)
         margin = (price - production_cost) / price
         required_margin = self.MARGIN_REQUIREMENTS[category]
         
@@ -146,8 +205,11 @@ class CostOracle:
             "margin": round(margin * 100, 2),
             "required_margin": round(required_margin * 100, 2),
             "category": category,
+            "currency": currency,
+            "currency_rate": self.get_crypto_rate(currency),
         }
 
+    # ==================== SALES LOGGING ====================
     def log_sale(
         self,
         product_name: str,
@@ -155,129 +217,97 @@ class CostOracle:
         category: str,
         price: float,
         payment_method: str,
+        currency: str = "BTC",
     ) -> Dict[str, Any]:
-        """
-        Log a sale and update inventory.
-        
-        Args:
-            product_name: Name of the product.
-            quantity: Quantity sold in grams.
-            category: Customer category.
-            price: Selling price in DKK.
-            payment_method: Payment method (e.g., "XMR", "BTC", "Cash").
-        
-        Returns:
-            Dict: Sale log entry.
-        """
+        """Log a sale (no permanent storage, only in-memory)."""
         if product_name not in self.PRODUCTS:
             return {"status": "error", "error": f"Unknown product: {product_name}"}
         
-        # Update inventory
+        product = self.PRODUCTS[product_name]
+        if currency not in product.get("supported_currencies", ["BTC"]):
+            return {"status": "error", "error": f"Currency {currency} not supported for {product_name}"}
+        
         if product_name not in self.inventory:
             self.inventory[product_name] = 0
         self.inventory[product_name] -= quantity
         
-        # Create sale entry
         sale_entry = {
             "product": product_name,
             "quantity": quantity,
             "category": category,
             "price": price,
             "payment_method": payment_method,
+            "currency": currency,
+            "currency_rate": self.get_crypto_rate(currency),
             "timestamp": self._get_timestamp(),
-            "margin": self.validate_margin(product_name, price, category)["margin"],
+            "margin": self.validate_margin(product_name, price, category, currency)["margin"],
         }
         self.sales_log.append(sale_entry)
-        
         return {"status": "success", "sale": sale_entry}
 
+    # ==================== DEMAND PREDICTION ====================
     def predict_demand(self, product_name: str, days: int) -> Dict[str, Any]:
-        """
-        Predict demand for a product based on historical sales data.
-        
-        Args:
-            product_name: Name of the product.
-            days: Number of days to predict for.
-        
-        Returns:
-            Dict: Predicted demand.
-        """
+        """Predict demand for a product based on historical sales."""
         if product_name not in self.PRODUCTS:
             return {"error": f"Unknown product: {product_name}"}
         
-        # Filter sales log for the product
-        product_sales = [
-            sale for sale in self.sales_log if sale["product"] == product_name
-        ]
-        
+        product_sales = [sale for sale in self.sales_log if sale["product"] == product_name]
         if not product_sales:
             return {"predicted_demand": 0, "confidence": 0.0}
         
-        # Calculate average daily sales
         total_quantity = sum(sale["quantity"] for sale in product_sales)
         total_days = len(set(sale["timestamp"] for sale in product_sales))
         avg_daily_sales = total_quantity / total_days if total_days > 0 else 0
-        
         predicted_demand = avg_daily_sales * days
         
         return {
             "product": product_name,
             "predicted_demand": round(predicted_demand, 2),
             "avg_daily_sales": round(avg_daily_sales, 2),
-            "confidence": min(1.0, len(product_sales) / 10.0),  # Confidence increases with more data
+            "confidence": min(1.0, len(product_sales) / 10.0),
         }
 
+    # ==================== UTILITIES ====================
     def _get_timestamp(self) -> str:
         """Get current timestamp in ISO format."""
-        from datetime import datetime
         return datetime.now().isoformat()
 
     def get_inventory(self) -> Dict[str, float]:
-        """
-        Get current inventory levels.
-        
-        Returns:
-            Dict: Inventory levels for all products.
-        """
+        """Get current inventory levels."""
         return self.inventory.copy()
 
     def update_inventory(self, product_name: str, quantity: float) -> bool:
-        """
-        Update inventory for a product.
-        
-        Args:
-            product_name: Name of the product.
-            quantity: Quantity to add (positive) or remove (negative).
-        
-        Returns:
-            bool: True if update was successful, False otherwise.
-        """
+        """Update inventory for a product."""
         if product_name not in self.PRODUCTS:
             return False
-        
         if product_name not in self.inventory:
             self.inventory[product_name] = 0
-        
         self.inventory[product_name] += quantity
         return True
 
+    def enable_dynamic_pricing(self, enabled: bool = True) -> None:
+        """Enable or disable dynamic pricing."""
+        self.dynamic_pricing_enabled = enabled
+        print(f"[CostOracle] {'✅' if enabled else '❌'} Dynamic pricing {'enabled' if enabled else 'disabled'}")
+
+    def get_supported_currencies(self, product_name: Optional[str] = None) -> List[str]:
+        """Get a list of supported cryptocurrencies."""
+        if product_name and product_name in self.PRODUCTS:
+            return self.PRODUCTS[product_name].get("supported_currencies", ["BTC"])
+        currencies = set()
+        for product in self.PRODUCTS.values():
+            currencies.update(product.get("supported_currencies", ["BTC"]))
+        return list(currencies)
+
 
 if __name__ == "__main__":
-    # Example usage
     oracle = CostOracle()
-    
-    # Calculate extract cost
-    extract_cost = oracle.calculate_extract_cost(5.0)
-    print(f"Extract cost for 5g basehash: {extract_cost} DKK/g")
-    
-    # Validate margin
-    margin_result = oracle.validate_margin("Fedsnade", 350, "knd")
-    print(f"Margin validation: {margin_result}")
-    
-    # Log a sale
-    sale_result = oracle.log_sale("Fedsnade", 1, "knd", 350, "XMR")
-    print(f"Sale log: {sale_result}")
-    
-    # Predict demand
-    demand_result = oracle.predict_demand("Fedsnade", 7)
-    print(f"Demand prediction: {demand_result}")
+    oracle.fetch_live_rates()
+    for currency in ["BTC", "XMR", "LTC", "BCH"]:
+        cost = oracle.calculate_extract_cost(5.0, currency)
+        print(f"Extract cost for 5g basehash ({currency}): {cost} DKK/g")
+    for currency in ["BTC", "XMR"]:
+        margin = oracle.validate_margin("Fedsnade", 350, "knd", currency)
+        print(f"Margin validation ({currency}): {margin}")
+    sale = oracle.log_sale("Fedsnade", 1, "knd", 350, "XMR", "XMR")
+    print(f"Sale log: {sale}")

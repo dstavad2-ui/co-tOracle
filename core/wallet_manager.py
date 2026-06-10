@@ -162,10 +162,46 @@ class WalletManager:
         print(f"[WalletManager] ✅ Generated new address for {wallet_name}: {address}")
         return address
 
+    def generate_address_for_currency(self, wallet_name: str, currency: str) -> Optional[str]:
+        """
+        Generate a new address for a specific cryptocurrency.
+        
+        Args:
+            wallet_name: Name of the wallet (e.g., "electrum", "sparrow", "wasabi").
+            currency: Cryptocurrency symbol (e.g., "BTC", "XMR", "LTC", "BCH").
+        
+        Returns:
+            str: New cryptocurrency address, or None if generation failed.
+        """
+        # Check if wallet exists in settings
+        if wallet_name not in self.wallet_settings:
+            print(f"[WalletManager] ❌ Unknown wallet: {wallet_name}")
+            return None
+        
+        # For now, generate a random address based on currency prefix
+        # In a real implementation, this would use wallet APIs
+        address = self._generate_random_address_for_currency(currency)
+        print(f"[WalletManager] ✅ Generated new {currency} address for {wallet_name}: {address}")
+        return address
+
     def _generate_random_address(self) -> str:
         """Generate a random Bitcoin-like address for testing."""
         # This is a placeholder. In a real implementation, use wallet APIs.
         prefix = secrets.choice(["bc1", "3", "1"])
+        random_part = secrets.token_hex(15)
+        return f"{prefix}{random_part}"
+
+    def _generate_random_address_for_currency(self, currency: str) -> str:
+        """Generate a random address for a specific cryptocurrency."""
+        # Currency-specific address prefixes
+        currency_prefixes = {
+            "BTC": ["bc1", "3", "1"],
+            "XMR": ["4"],
+            "LTC": ["L", "M", "ltc1"],
+            "BCH": ["q", "p"],
+        }
+        prefixes = currency_prefixes.get(currency, ["addr"])
+        prefix = secrets.choice(prefixes)
         random_part = secrets.token_hex(15)
         return f"{prefix}{random_part}"
 

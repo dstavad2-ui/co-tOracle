@@ -1,9 +1,47 @@
 {
-  "tor_proxy": "socks5://127.0.0.1:9050",
-  "tor_check_url": "https://check.torproject.org/api/ip",
-  "vault_key_path": "data/keys/ntrli_key.key",
-  "vault_data_path": "data/vault.enc",
-  "critical_processes": ["sparrow", "wasabi", "electrum", "python", "java", "dotnet"],
+  "ai_oracle": {
+    "enabled": true,
+    "default_provider": "devstral",
+    "default_model": "devstral-latest",
+    "dynamic_pricing_enabled": true,
+    "trading_advisor_enabled": true,
+    "security_validation_enabled": true
+  },
+  "tor_guardian": {
+    "block_clearnet": true,
+    "tor_proxy": "socks5://127.0.0.1:9050",
+    "tor_check_url": "https://check.torproject.org/api/ip"
+  },
+  "ntrli_core": {
+    "logging_enabled": true,
+    "log_file": "ntRLI_orders.log",
+    "temp_transaction_retention_minutes": 60,
+    "allowed_log_fields": ["order_id", "currency", "amount", "timestamp", "status"],
+    "batch_threshold": 5,
+    "dynamic_batch_threshold": true
+  },
+  "data_vault": {
+    "encryption_enabled": true,
+    "encryption_key_file": "vault.key",
+    "vault_data_path": "data/vault.enc"
+  },
+  "cost_oracle": {
+    "dynamic_pricing_enabled": true,
+    "default_currency": "BTC",
+    "supported_currencies": ["BTC", "XMR", "LTC", "BCH"],
+    "static_margins": {
+      "BTC": 10.0,
+      "XMR": 15.0,
+      "LTC": 8.0,
+      "BCH": 12.0
+    }
+  },
+  "bybit_bridge": {
+    "base_url": "https://api.bybit.com",
+    "api_rate_limit": 20,
+    "timeout": 10,
+    "supported_coins": ["BTC", "XMR", "LTC", "BCH"]
+  },
   "wallet_settings": {
     "sparrow": {
       "path": "wallets/sparrow.jar",
@@ -20,15 +58,5 @@
       "proxy_args": "--proxy socks5:127.0.0.1:9050",
       "coinjoin_plugin": true
     }
-  },
-  "bybit_api": {
-    "base_url": "https://api.bybit.com",
-    "rate_limit": 20,
-    "timeout": 10
-  },
-  "security": {
-    "memory_wipe_on_exit": true,
-    "max_retries": 3,
-    "encryption_algorithm": "AES-256-GCM"
   }
 }

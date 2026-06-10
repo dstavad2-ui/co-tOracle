@@ -1,0 +1,15 @@
+# NTRLI_MOBILE_AGENT Dependencies
+# ================================
+
+# Core dependencies
+requests>=2.31.0
+cryptography>=41.0.0
+python-dotenv>=1.0.0
+httpx>=0.25.0
+
+# Optional: For async support
+# aiohttp>=3.8.0
+
+# Development dependencies (optional)
+# pytest>=7.0.0
+# mypy>=1.0.0
