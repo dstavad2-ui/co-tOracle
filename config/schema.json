@@ -1,0 +1,143 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NTRLI_MOBILE_AGENT Configuration Schema",
+  "type": "object",
+  "required": [
+    "tor_proxy",
+    "tor_check_url",
+    "vault_key_path",
+    "vault_data_path",
+    "critical_processes",
+    "wallet_settings",
+    "bybit_api",
+    "security"
+  ],
+  "properties": {
+    "tor_proxy": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^socks5://[0-9.]+:[0-9]+$",
+      "description": "Tor SOCKS5 proxy URL (e.g., socks5://127.0.0.1:9050)"
+    },
+    "tor_check_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL to check Tor connectivity (e.g., https://check.torproject.org/api/ip)"
+    },
+    "vault_key_path": {
+      "type": "string",
+      "description": "Path to the encryption key file"
+    },
+    "vault_data_path": {
+      "type": "string",
+      "description": "Path to the encrypted vault file"
+    },
+    "critical_processes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of critical processes to kill if Tor fails"
+    },
+    "wallet_settings": {
+      "type": "object",
+      "required": ["sparrow", "wasabi", "electrum"],
+      "properties": {
+        "sparrow": {
+          "type": "object",
+          "required": ["path", "proxy_args", "coinjoin_backend"],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Path to Sparrow wallet JAR file"
+            },
+            "proxy_args": {
+              "type": "string",
+              "description": "Proxy arguments for Sparrow"
+            },
+            "coinjoin_backend": {
+              "type": "string",
+              "description": "CoinJoin backend (e.g., whirlpool)"
+            }
+          }
+        },
+        "wasabi": {
+          "type": "object",
+          "required": ["path", "headless_args", "coinjoin_enabled"],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Path to Wasabi wallet DLL file"
+            },
+            "headless_args": {
+              "type": "string",
+              "description": "Headless mode arguments for Wasabi"
+            },
+            "coinjoin_enabled": {
+              "type": "boolean",
+              "description": "Whether CoinJoin is enabled for Wasabi"
+            }
+          }
+        },
+        "electrum": {
+          "type": "object",
+          "required": ["path", "proxy_args", "coinjoin_plugin"],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Path to Electrum executable"
+            },
+            "proxy_args": {
+              "type": "string",
+              "description": "Proxy arguments for Electrum"
+            },
+            "coinjoin_plugin": {
+              "type": "boolean",
+              "description": "Whether CoinJoin plugin is enabled for Electrum"
+            }
+          }
+        }
+      }
+    },
+    "bybit_api": {
+      "type": "object",
+      "required": ["base_url", "rate_limit", "timeout"],
+      "properties": {
+        "base_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Bybit API base URL"
+        },
+        "rate_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum requests per minute"
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Request timeout in seconds"
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "required": ["memory_wipe_on_exit", "max_retries", "encryption_algorithm"],
+      "properties": {
+        "memory_wipe_on_exit": {
+          "type": "boolean",
+          "description": "Whether to wipe memory on exit"
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of retries for failed operations"
+        },
+        "encryption_algorithm": {
+          "type": "string",
+          "description": "Encryption algorithm (e.g., AES-256-GCM)"
+        }
+      }
+    }
+  }
+}

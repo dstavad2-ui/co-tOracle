@@ -1,0 +1,34 @@
+{
+  "tor_proxy": "socks5://127.0.0.1:9050",
+  "tor_check_url": "https://check.torproject.org/api/ip",
+  "vault_key_path": "data/keys/ntrli_key.key",
+  "vault_data_path": "data/vault.enc",
+  "critical_processes": ["sparrow", "wasabi", "electrum", "python", "java", "dotnet"],
+  "wallet_settings": {
+    "sparrow": {
+      "path": "wallets/sparrow.jar",
+      "proxy_args": "--proxy socks5:127.0.0.1:9050",
+      "coinjoin_backend": "whirlpool"
+    },
+    "wasabi": {
+      "path": "wallets/Wasabi.Wallet.Wpf.dll",
+      "headless_args": "--headless --proxy socks5://127.0.0.1:9050",
+      "coinjoin_enabled": true
+    },
+    "electrum": {
+      "path": "electrum",
+      "proxy_args": "--proxy socks5:127.0.0.1:9050",
+      "coinjoin_plugin": true
+    }
+  },
+  "bybit_api": {
+    "base_url": "https://api.bybit.com",
+    "rate_limit": 20,
+    "timeout": 10
+  },
+  "security": {
+    "memory_wipe_on_exit": true,
+    "max_retries": 3,
+    "encryption_algorithm": "AES-256-GCM"
+  }
+}
